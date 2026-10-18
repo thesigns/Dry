@@ -32,7 +32,7 @@ After opening, a prompt (`dry>`, or `YYYY-MM-DD>` while writing) accepts these c
 | `/undo` | Remove the last paragraph of today's entry; empty segments and entries are dropped |
 | `/list [N]` | Last N entries (default 10): `#00001 2026-10-17 -- preview (...)` |
 | `/show [N \| YYYY-MM-DD]` | Full entry; with no argument, today's entry |
-| `/find TEXT` | Case-insensitive substring search (the rest of the line is the phrase); prints `#00001 2026-10-18 [19:06] (...) context (...)` per matching paragraph |
+| `/find TEXT` | Case-insensitive substring search (the rest of the line is the phrase); one line per matching day: `#00001 2026-10-18 (matches: 3) -- (...) context of the first match (...)` |
 | `/export [F]` | Unencrypted Markdown export after a warning and `[y/N]` (plus another one to overwrite). No argument: `<name>.md` next to the diary; a bare name goes into the diary's directory; `.md` is added if there is no extension; `.dry` targets are refused. Block markers at the start of a paragraph are escaped |
 | `/passwd` | Change the password: asks for the current one, then the new one twice; re-keys with a fresh salt |
 | `/help` | Show help |

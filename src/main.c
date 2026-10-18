@@ -272,7 +272,7 @@ static void cmd_help(void)
         "  /undo       remove the last paragraph of today's entry\n"
         "  /list [N]   last N entries (default 10)\n"
         "  /show [N]   full entry number N, date YYYY-MM-DD, or today's entry\n"
-        "  /find TEXT  paragraphs containing TEXT (case-insensitive)\n"
+        "  /find TEXT  days that mention TEXT (case-insensitive)\n"
         "  /export [F] save the diary as an UNENCRYPTED Markdown file\n"
         "  /passwd     change the password\n"
         "  /help       this help\n"
@@ -557,7 +557,8 @@ static size_t utf8_forward(const char *s, size_t pos, size_t n)
     return pos;
 }
 
-static void print_match(const Entry *e, const Segment *s, const char *para, size_t off,
+/* One line per matching day: the number of matches and the context of the first one. */
+static void print_match(const Entry *e, size_t matches, const char *para, size_t off,
                         size_t len)
 {
     size_t from = utf8_back(para, off, FIND_CONTEXT);
@@ -581,13 +582,13 @@ static void print_match(const Entry *e, const Segment *s, const char *para, size
         }
     }
 
-    out("#%05u %s [%s] %s%.*s%s\n", (unsigned)e->id, e->date, s->time,
+    out("#%05u %s (matches: %zu) -- %s%.*s%s\n", (unsigned)e->id, e->date, matches,
         from > 0 ? "(...) " : "", (int)(to - from), para + from, para[to] ? " (...)" : "");
 }
 
 static void cmd_find(App *app, const char *arg)
 {
-    size_t needle_len = strlen(arg), cap = 0, hits = 0, entries = 0;
+    size_t needle_len = strlen(arg), cap = 0, entries = 0;
     char *needle, *buf = NULL;
 
     if (!*arg) {
@@ -604,7 +605,9 @@ static void cmd_find(App *app, const char *arg)
 
     for (size_t i = 0; i < app->diary.count; i++) {
         const Entry *e = &app->diary.entries[i];
-        bool found = false;
+        const char *first = NULL; /* paragraph of the first match */
+        size_t first_off = 0, matches = 0;
+
         for (size_t j = 0; j < e->count; j++) {
             const Segment *s = &e->segs[j];
             for (size_t k = 0; k < s->count; k++) {
@@ -628,21 +631,24 @@ static void cmd_find(App *app, const char *arg)
                 }
                 memcpy(buf, para, len + 1);
                 text_fold(buf);
-                hit = strstr(buf, needle);
-                if (hit) {
-                    print_match(e, s, para, (size_t)(hit - buf), needle_len);
-                    hits++;
-                    found = true;
+                for (hit = strstr(buf, needle); hit; hit = strstr(hit + needle_len, needle)) {
+                    if (!first) {
+                        first = para;
+                        first_off = (size_t)(hit - buf);
+                    }
+                    matches++;
                 }
             }
         }
-        if (found)
+        if (first) {
+            print_match(e, matches, first, first_off, needle_len);
             entries++;
+        }
     }
-    if (hits == 0)
+    if (entries == 0)
         out("Nothing found for \"%s\".\n", arg);
     else
-        out("Matching paragraphs: %zu (entries: %zu).\n", hits, entries);
+        out("Matching days: %zu. Use /show N to read one.\n", entries);
 done:
     if (buf) {
         sodium_memzero(buf, cap);
