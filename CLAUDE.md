@@ -35,6 +35,7 @@ After opening, a prompt (`dry>`, or `YYYY-MM-DD>` while writing) accepts these c
 | `/find TEXT` | Case-insensitive substring search (the rest of the line is the phrase); one line per matching day: `#00001 2026-10-18 (matches: 3) -- (...) context of the first match (...)` |
 | `/export [F]` | Unencrypted Markdown export after a warning and `[y/N]` (plus another one to overwrite). No argument: `<name>.md` next to the diary; a bare name goes into the diary's directory; `.md` is added if there is no extension; `.dry` targets are refused. Block markers at the start of a paragraph are escaped |
 | `/passwd` | Change the password: asks for the current one, then the new one twice; re-keys with a fresh salt |
+| `/version` | Program and libsodium versions (also `dry --version` / `dry -v`) |
 | `/help` | Show help |
 | `/exit` | Quit; `/quit`, EOF and Ctrl+C also quit |
 
@@ -45,6 +46,7 @@ While writing, each line is one paragraph and is saved immediately. A line start
 - `src/main.c`: argument handling, path resolution, password prompts, the command loop, and all user-facing messages.
 - `src/diary.c/.h`: in-memory model and (de)serialization of the plaintext payload. The model is Diary → Entry (one per date, sequential `id`) → Segment (`HH:MM`, one per `/start`) → paragraphs (UTF-8 strings).
 - `src/text.c/.h`: `text_fold()`, a length-preserving in-place lowercase for ASCII, Latin-1, Latin Extended-A, Greek and Cyrillic, used by `/find`. Characters outside these ranges (including `ß`, Turkish `İ`/`ı`) compare exactly.
+- `src/version.h`: `DRY_VERSION`, see Versioning below.
 - `src/store.c/.h`: the encrypted file format, key derivation, encryption, and atomic save.
 - `src/platform.h` with `platform_win.c` and `platform_posix.c`: all OS-specific code, namely console I/O, password input without echo, UTF-8 argv, exe directory, file open/replace/sync, the lock file, the Ctrl+C handler, and `localtime`.
 
@@ -66,6 +68,13 @@ While writing, each line is one paragraph and is saved immediately. A line start
 - **Sensitive data:** zero plaintext buffers (input lines, serialized payload, passwords) with `sodium_memzero` before freeing them. Passwords and keys go in `sodium_malloc` memory. Avoid `realloc` on plaintext buffers.
 - **Untrusted input:** treat the decrypted payload and the file header as untrusted. Bounds-check every read, and reject absurd counts and Argon2 limits.
 - **Style:** 4-space indentation, opening brace on its own line for functions, `snake_case` names, and small `static` helpers.
+
+## Versioning
+
+- The program version lives only in `src/version.h` (`DRY_VERSION`) and follows Semantic Versioning: PATCH for fixes, MINOR for new commands or features, MAJOR for incompatible changes. Before 1.0.0, anything may still change.
+- A release means: bump `DRY_VERSION`, add a section to `CHANGELOG.md` (move items from `[Unreleased]` if present), commit, then tag with an annotated `git tag -a vX.Y.Z`.
+- Between releases, record user-visible changes under `## [Unreleased]` at the top of `CHANGELOG.md`.
+- The program version is independent of the file format and payload version bytes; a new release does not imply a format change.
 
 ## Testing
 

@@ -10,6 +10,7 @@
 #include "platform.h"
 #include "store.h"
 #include "text.h"
+#include "version.h"
 
 #define PASSWORD_MAX  256
 #define MAX_ATTEMPTS  3
@@ -264,6 +265,11 @@ static bool ask_new_password(char *pw, char *pw2)
 
 /* --- commands --- */
 
+static void cmd_version(void)
+{
+    out("dry %s (libsodium %s)\n", DRY_VERSION, sodium_version_string());
+}
+
 static void cmd_help(void)
 {
     put("Commands:\n"
@@ -275,6 +281,7 @@ static void cmd_help(void)
         "  /find TEXT  days that mention TEXT (case-insensitive)\n"
         "  /export [F] save the diary as an UNENCRYPTED Markdown file\n"
         "  /passwd     change the password\n"
+        "  /version    program and library versions\n"
         "  /help       this help\n"
         "  /exit       quit\n"
         "While writing, each Enter ends and saves a paragraph.\n"
@@ -725,6 +732,8 @@ static bool handle_line(App *app, char *line)
             cmd_export(app, arg);
         else if (strcmp(cmd, "passwd") == 0)
             cmd_passwd(app);
+        else if (strcmp(cmd, "version") == 0)
+            cmd_version();
         else if (strcmp(cmd, "help") == 0)
             cmd_help();
         else if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0)
@@ -854,9 +863,14 @@ int main(int argc, char **argv)
         return 1;
     }
     uargv = platform_utf8_argv(argc, argv, &uargc);
+    if (uargv && uargc == 2 && (strcmp(uargv[1], "--version") == 0 || strcmp(uargv[1], "-v") == 0)) {
+        cmd_version();
+        return 0;
+    }
     if (!uargv || uargc != 2 || uargv[1][0] == '-') {
-        put("dry – encrypted diary\n"
+        put("dry " DRY_VERSION " – encrypted diary\n"
             "Usage: dry <name>\n"
+            "       dry --version\n"
             "  e.g. dry kuba  – opens or creates the file kuba.dry next to the program\n");
         return 2;
     }

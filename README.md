@@ -30,6 +30,7 @@ dry> /exit
 | `/find TEXT` | List the days that mention TEXT, ignoring letter case (Polish letters included) |
 | `/export [file]` | Save the whole diary as a Markdown file (**not encrypted**; default `<name>.md` next to the diary) |
 | `/passwd` | Change the password |
+| `/version` | Show the program version (also `dry --version`) |
 | `/help` | Show help |
 | `/exit` | Quit |
 
