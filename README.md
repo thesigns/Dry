@@ -5,7 +5,7 @@ A small, portable console diary in C. The whole diary lives in a single file enc
 ```
 > dry kuba
 Password:
-Diary kuba opened (entries: 2). Help: /help
+Diary "C:\Tools\dry\kuba.dry" opened (entries: 2). Help: /help
 dry> /list
 #00001 2026-10-17 -- Felt a bit down today, maybe I need (...)
 #00002 2026-10-18 -- Started writing a program called dry (...)

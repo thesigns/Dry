@@ -747,7 +747,7 @@ int main(int argc, char **argv)
     diary_init(&app.diary);
     ok = platform_file_exists(path) ? open_existing(&app, path) : create_new(&app, path);
     if (ok) {
-        out("Diary %s opened (entries: %zu). Help: /help\n", uargv[1], app.diary.count);
+        out("Diary \"%s\" opened (entries: %zu). Help: /help\n", path, app.diary.count);
         run(&app);
         diary_free(&app.diary);
         store_close(&app.store);
