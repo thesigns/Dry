@@ -9,11 +9,13 @@
 #include "diary.h"
 #include "platform.h"
 #include "store.h"
+#include "text.h"
 
 #define PASSWORD_MAX  256
 #define MAX_ATTEMPTS  3
 #define LIST_DEFAULT  10
 #define PREVIEW_CHARS 50
+#define FIND_CONTEXT  30 /* characters shown on each side of a /find match */
 
 typedef struct {
     Diary diary;
@@ -270,6 +272,7 @@ static void cmd_help(void)
         "  /undo       remove the last paragraph of today's entry\n"
         "  /list [N]   last N entries (default 10)\n"
         "  /show [N]   full entry number N, date YYYY-MM-DD, or today's entry\n"
+        "  /find TEXT  paragraphs containing TEXT (case-insensitive)\n"
         "  /export [F] save the diary as an UNENCRYPTED Markdown file\n"
         "  /passwd     change the password\n"
         "  /help       this help\n"
@@ -532,6 +535,123 @@ done:
     free(path);
 }
 
+/* Moves pos back / forward by up to n UTF-8 characters. */
+static size_t utf8_back(const char *s, size_t pos, size_t n)
+{
+    while (pos > 0 && n > 0) {
+        pos--;
+        if (((unsigned char)s[pos] & 0xC0) != 0x80)
+            n--;
+    }
+    return pos;
+}
+
+static size_t utf8_forward(const char *s, size_t pos, size_t n)
+{
+    while (s[pos] && n > 0) {
+        pos++;
+        while (((unsigned char)s[pos] & 0xC0) == 0x80)
+            pos++;
+        n--;
+    }
+    return pos;
+}
+
+static void print_match(const Entry *e, const Segment *s, const char *para, size_t off,
+                        size_t len)
+{
+    size_t from = utf8_back(para, off, FIND_CONTEXT);
+    size_t to = utf8_forward(para, off + len, FIND_CONTEXT);
+
+    /* Cut at word boundaries where the context has a space to cut at. */
+    if (from > 0) {
+        for (size_t p = from; p < off; p++) {
+            if (para[p] == ' ') {
+                from = p + 1;
+                break;
+            }
+        }
+    }
+    if (para[to]) {
+        for (size_t p = to; p > off + len; p--) {
+            if (para[p] == ' ') {
+                to = p;
+                break;
+            }
+        }
+    }
+
+    out("#%05u %s [%s] %s%.*s%s\n", (unsigned)e->id, e->date, s->time,
+        from > 0 ? "(...) " : "", (int)(to - from), para + from, para[to] ? " (...)" : "");
+}
+
+static void cmd_find(App *app, const char *arg)
+{
+    size_t needle_len = strlen(arg), cap = 0, hits = 0, entries = 0;
+    char *needle, *buf = NULL;
+
+    if (!*arg) {
+        put("Usage: /find TEXT, e.g. /find holiday\n");
+        return;
+    }
+    needle = malloc(needle_len + 1);
+    if (!needle) {
+        put("ERROR: out of memory.\n");
+        return;
+    }
+    memcpy(needle, arg, needle_len + 1);
+    text_fold(needle);
+
+    for (size_t i = 0; i < app->diary.count; i++) {
+        const Entry *e = &app->diary.entries[i];
+        bool found = false;
+        for (size_t j = 0; j < e->count; j++) {
+            const Segment *s = &e->segs[j];
+            for (size_t k = 0; k < s->count; k++) {
+                const char *para = s->paras[k], *hit;
+                size_t len = strlen(para);
+
+                if (len < needle_len)
+                    continue;
+                /* Grow by allocating anew, so no plaintext is left behind by realloc. */
+                if (len + 1 > cap) {
+                    if (buf) {
+                        sodium_memzero(buf, cap);
+                        free(buf);
+                    }
+                    cap = len + 1 > 2 * cap ? len + 1 : 2 * cap;
+                    buf = malloc(cap);
+                    if (!buf) {
+                        put("ERROR: out of memory.\n");
+                        goto done;
+                    }
+                }
+                memcpy(buf, para, len + 1);
+                text_fold(buf);
+                hit = strstr(buf, needle);
+                if (hit) {
+                    print_match(e, s, para, (size_t)(hit - buf), needle_len);
+                    hits++;
+                    found = true;
+                }
+            }
+        }
+        if (found)
+            entries++;
+    }
+    if (hits == 0)
+        out("Nothing found for \"%s\".\n", arg);
+    else
+        out("Matching paragraphs: %zu (entries: %zu).\n", hits, entries);
+done:
+    if (buf) {
+        sodium_memzero(buf, cap);
+        free(buf);
+    }
+    sodium_memzero(needle, needle_len);
+    free(needle);
+}
+
 static void cmd_passwd(App *app)
 {
     char *pw = sodium_malloc(PASSWORD_MAX), *pw2 = sodium_malloc(PASSWORD_MAX);
@@ -593,6 +713,8 @@ static bool handle_line(App *app, char *line)
             cmd_list(app, arg);
         else if (strcmp(cmd, "show") == 0)
             cmd_show(app, arg);
+        else if (strcmp(cmd, "find") == 0)
+            cmd_find(app, arg);
         else if (strcmp(cmd, "export") == 0)
             cmd_export(app, arg);
         else if (strcmp(cmd, "passwd") == 0)

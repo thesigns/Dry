@@ -32,6 +32,7 @@ After opening, a prompt (`dry>`, or `YYYY-MM-DD>` while writing) accepts these c
 | `/undo` | Remove the last paragraph of today's entry; empty segments and entries are dropped |
 | `/list [N]` | Last N entries (default 10): `#00001 2026-10-17 -- preview (...)` |
 | `/show [N \| YYYY-MM-DD]` | Full entry; with no argument, today's entry |
+| `/find TEXT` | Case-insensitive substring search (the rest of the line is the phrase); prints `#00001 2026-10-18 [19:06] (...) context (...)` per matching paragraph |
 | `/export [F]` | Unencrypted Markdown export after a warning and `[y/N]` (plus another one to overwrite). No argument: `<name>.md` next to the diary; a bare name goes into the diary's directory; `.md` is added if there is no extension; `.dry` targets are refused. Block markers at the start of a paragraph are escaped |
 | `/passwd` | Change the password: asks for the current one, then the new one twice; re-keys with a fresh salt |
 | `/help` | Show help |
@@ -43,6 +44,7 @@ While writing, each line is one paragraph and is saved immediately. A line start
 
 - `src/main.c`: argument handling, path resolution, password prompts, the command loop, and all user-facing messages.
 - `src/diary.c/.h`: in-memory model and (de)serialization of the plaintext payload. The model is Diary → Entry (one per date, sequential `id`) → Segment (`HH:MM`, one per `/start`) → paragraphs (UTF-8 strings).
+- `src/text.c/.h`: `text_fold()`, a length-preserving in-place lowercase for ASCII, Latin-1, Latin Extended-A, Greek and Cyrillic, used by `/find`. Characters outside these ranges (including `ß`, Turkish `İ`/`ı`) compare exactly.
 - `src/store.c/.h`: the encrypted file format, key derivation, encryption, and atomic save.
 - `src/platform.h` with `platform_win.c` and `platform_posix.c`: all OS-specific code, namely console I/O, password input without echo, UTF-8 argv, exe directory, file open/replace/sync, the lock file, the Ctrl+C handler, and `localtime`.
 
