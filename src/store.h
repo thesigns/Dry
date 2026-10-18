@@ -14,6 +14,7 @@
 #ifndef DRY_STORE_H
 #define DRY_STORE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -42,6 +43,14 @@ StoreResult store_open(Store *s, const char *path, const char *password,
 
 /* Encrypts and atomically writes the contents (always with a fresh nonce). */
 StoreResult store_save(const Store *s, const unsigned char *plain, size_t len);
+
+/* Checks a password against the key in memory (derives it again with the stored salt). */
+bool store_check_password(const Store *s, const char *password);
+
+/* Re-keys the diary with a new password and a fresh salt, then saves the contents.
+ * On failure the old key, salt and file stay in effect. */
+StoreResult store_change_password(Store *s, const char *password,
+                                  const unsigned char *plain, size_t len);
 
 void store_close(Store *s);
 const char *store_strerror(StoreResult r);

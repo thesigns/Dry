@@ -200,6 +200,31 @@ static void print_entry(const Entry *e)
     }
 }
 
+/* Asks for a new password twice into pw (both buffers PASSWORD_MAX, sodium_malloc). */
+static bool ask_new_password(char *pw, char *pw2)
+{
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        bool match;
+
+        put("New password: ");
+        if (platform_read_password(pw, PASSWORD_MAX) != READ_OK)
+            return false;
+        if (pw[0] == '\0') {
+            put("The password cannot be empty.\n");
+            continue;
+        }
+        put("Repeat password: ");
+        if (platform_read_password(pw2, PASSWORD_MAX) != READ_OK)
+            return false;
+        match = strcmp(pw, pw2) == 0;
+        sodium_memzero(pw2, PASSWORD_MAX);
+        if (match)
+            return true;
+        put("The passwords do not match.\n");
+    }
+    return false;
+}
+
 /* --- commands --- */
 
 static void cmd_help(void)
@@ -210,6 +235,7 @@ static void cmd_help(void)
         "  /undo       remove the last paragraph of today's entry\n"
         "  /list [N]   last N entries (default 10)\n"
         "  /show [N]   full entry number N, date YYYY-MM-DD, or today's entry\n"
+        "  /passwd     change the password\n"
         "  /help       this help\n"
         "  /exit       quit\n"
         "While writing, each Enter ends and saves a paragraph.\n"
@@ -373,6 +399,46 @@ static void cmd_undo(App *app)
     save_diary(app);
 }
 
+static void cmd_passwd(App *app)
+{
+    char *pw = sodium_malloc(PASSWORD_MAX), *pw2 = sodium_malloc(PASSWORD_MAX);
+    unsigned char *buf;
+    size_t len;
+    StoreResult r;
+
+    if (!pw || !pw2) {
+        put("ERROR: out of memory.\n");
+        goto done;
+    }
+    put("Current password: ");
+    if (platform_read_password(pw, PASSWORD_MAX) != READ_OK)
+        goto done;
+    if (!store_check_password(&app->store, pw)) {
+        put("Wrong password – the password was not changed.\n");
+        goto done;
+    }
+    if (!ask_new_password(pw, pw2)) {
+        put("The password was not changed.\n");
+        goto done;
+    }
+    if (!diary_serialize(&app->diary, &buf, &len)) {
+        put("ERROR: out of memory – the password was not changed.\n");
+        goto done;
+    }
+    r = store_change_password(&app->store, pw, buf, len);
+    sodium_memzero(buf, len);
+    free(buf);
+    if (r != STORE_OK)
+        out("ERROR: %s – the password was not changed.\n", store_strerror(r));
+    else
+        put("Password changed.\n");
+done:
+    if (pw)
+        sodium_free(pw);
+    if (pw2)
+        sodium_free(pw2);
+}
+
 /* Returns false when the program should exit. */
 static bool handle_line(App *app, char *line)
 {
@@ -394,6 +460,8 @@ static bool handle_line(App *app, char *line)
             cmd_list(app, arg);
         else if (strcmp(cmd, "show") == 0)
             cmd_show(app, arg);
+        else if (strcmp(cmd, "passwd") == 0)
+            cmd_passwd(app);
         else if (strcmp(cmd, "help") == 0)
             cmd_help();
         else if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "quit") == 0)
@@ -467,7 +535,7 @@ static bool ask_yes(void)
 static bool create_new(App *app, const char *path)
 {
     char *pw = sodium_malloc(PASSWORD_MAX), *pw2 = sodium_malloc(PASSWORD_MAX);
-    bool ok = false, have_pw = false;
+    bool ok = false;
     StoreResult r;
 
     if (!pw || !pw2)
@@ -477,25 +545,7 @@ static bool create_new(App *app, const char *path)
         put("Cancelled.\n");
         goto done;
     }
-
-    for (int attempt = 0; attempt < MAX_ATTEMPTS && !have_pw; attempt++) {
-        put("New password: ");
-        if (platform_read_password(pw, PASSWORD_MAX) != READ_OK)
-            goto done;
-        if (pw[0] == '\0') {
-            put("The password cannot be empty.\n");
-            continue;
-        }
-        put("Repeat password: ");
-        if (platform_read_password(pw2, PASSWORD_MAX) != READ_OK)
-            goto done;
-        if (strcmp(pw, pw2) != 0) {
-            put("The passwords do not match.\n");
-            continue;
-        }
-        have_pw = true;
-    }
-    if (!have_pw)
+    if (!ask_new_password(pw, pw2))
         goto done;
 
     r = store_create(&app->store, path, pw);

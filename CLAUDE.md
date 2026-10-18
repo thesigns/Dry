@@ -32,6 +32,7 @@ After opening, a prompt (`dry>`, or `YYYY-MM-DD>` while writing) accepts these c
 | `/undo` | Remove the last paragraph of today's entry; empty segments and entries are dropped |
 | `/list [N]` | Last N entries (default 10): `#00001 2026-10-17 -- preview (...)` |
 | `/show [N \| YYYY-MM-DD]` | Full entry; with no argument, today's entry |
+| `/passwd` | Change the password: asks for the current one, then the new one twice; re-keys with a fresh salt |
 | `/help` | Show help |
 | `/exit` | Quit; `/quit`, EOF and Ctrl+C also quit |
 
@@ -74,6 +75,5 @@ The following can only be verified manually in a real terminal: hidden password 
 
 ## Not implemented yet
 
-- `/passwd` (change password)
 - `/export`
 - Protection against opening the same diary in two processes; currently the last save wins.

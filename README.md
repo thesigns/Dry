@@ -27,6 +27,7 @@ dry> /exit
 | `/undo` | Remove the last paragraph of today's entry |
 | `/list [N]` | Show the last N entries (default 10) |
 | `/show [N \| YYYY-MM-DD]` | Show a full entry; with no argument, shows today's |
+| `/passwd` | Change the password |
 | `/help` | Show help |
 | `/exit` | Quit |
 

@@ -220,6 +220,50 @@ StoreResult store_save(const Store *s, const unsigned char *plain, size_t len)
     return ok ? STORE_OK : STORE_ERR_IO;
 }
 
+bool store_check_password(const Store *s, const char *password)
+{
+    Store probe;
+    bool ok;
+
+    memset(&probe, 0, sizeof probe);
+    probe.opslimit = s->opslimit;
+    probe.memlimit = s->memlimit;
+    memcpy(probe.salt, s->salt, sizeof probe.salt);
+    if (derive_key(&probe, password) != STORE_OK)
+        return false;
+    ok = sodium_memcmp(probe.key, s->key, KEY_BYTES) == 0;
+    sodium_free(probe.key);
+    return ok;
+}
+
+StoreResult store_change_password(Store *s, const char *password,
+                                  const unsigned char *plain, size_t len)
+{
+    Store next;
+    StoreResult r;
+
+    /* Old files are upgraded to the current Argon2 limits on the way. */
+    memset(&next, 0, sizeof next);
+    next.path = s->path;
+    next.opslimit = crypto_pwhash_OPSLIMIT_MODERATE;
+    next.memlimit = crypto_pwhash_MEMLIMIT_MODERATE;
+    randombytes_buf(next.salt, sizeof next.salt);
+    r = derive_key(&next, password);
+    if (r != STORE_OK)
+        return r;
+    r = store_save(&next, plain, len);
+    if (r != STORE_OK) {
+        sodium_free(next.key);
+        return r;
+    }
+    sodium_free(s->key);
+    s->key = next.key;
+    s->opslimit = next.opslimit;
+    s->memlimit = next.memlimit;
+    memcpy(s->salt, next.salt, sizeof s->salt);
+    return STORE_OK;
+}
+
 void store_close(Store *s)
 {
     if (s->key)
