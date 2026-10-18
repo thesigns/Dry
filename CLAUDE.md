@@ -7,8 +7,11 @@
 ```
 make            # Windows → build/dry.exe (static, no DLLs); Linux → build/dry
 make clean
+make dist       # release archive: build/dry-<version>-windows-x64.zip (Linux: .tar.gz)
 build/dry.exe kuba
 ```
+
+`make dist` takes the version from `src/version.h` and packs the binary with `README.md`, `LICENSE` and `CHANGELOG.md` into a top-level `dry-<version>-<os>-<arch>/` folder. On Windows it uses the `zip` that ships with w64devkit.
 
 - **Windows:** libsodium (official MinGW package, `libsodium-win64` folder; 1.0.22 used locally) is **not** in the repo. The Makefile expects it in `third_party/libsodium` (git-ignored) or at `make SODIUM=<path>`, and links it statically with `-DSODIUM_STATIC -static`. Setup steps are in `README.md`.
 - **Linux:** needs `libsodium-dev`. Flags come from `pkg-config`.
@@ -72,7 +75,7 @@ While writing, each line is one paragraph and is saved immediately. A line start
 ## Versioning
 
 - The program version lives only in `src/version.h` (`DRY_VERSION`) and follows Semantic Versioning: PATCH for fixes, MINOR for new commands or features, MAJOR for incompatible changes. Before 1.0.0, anything may still change.
-- A release means: bump `DRY_VERSION`, add a section to `CHANGELOG.md` (move items from `[Unreleased]` if present), commit, then tag with an annotated `git tag -a vX.Y.Z`.
+- A release means: bump `DRY_VERSION`, add a section to `CHANGELOG.md` (move items from `[Unreleased]` if present), commit, then tag with an annotated `git tag -a vX.Y.Z`. Push with `git push origin main --follow-tags`, run `make dist`, and attach the archive to a GitHub release made from the tag (there is no `gh` CLI; releases are created in the web UI).
 - Between releases, record user-visible changes under `## [Unreleased]` at the top of `CHANGELOG.md`.
 - The program version is independent of the file format and payload version bytes; a new release does not imply a format change.
 

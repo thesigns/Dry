@@ -40,4 +40,27 @@ build:
 clean:
 	rm -f build/*.o $(TARGET)
 
-.PHONY: all clean
+# Release archive: make dist → build/dry-<version>-windows-x64.zip (Linux: .tar.gz)
+VERSION  := $(shell sed -n 's/.*DRY_VERSION "\(.*\)".*/\1/p' src/version.h)
+DOCS      = README.md LICENSE CHANGELOG.md
+ifeq ($(OS),Windows_NT)
+  DIST    = dry-$(VERSION)-windows-x64
+  ARCHIVE = build/$(DIST).zip
+else
+  DIST    = dry-$(VERSION)-linux-$(shell uname -m)
+  ARCHIVE = build/$(DIST).tar.gz
+endif
+
+dist: $(TARGET) $(DOCS)
+	rm -rf build/dist $(ARCHIVE)
+	mkdir -p build/dist/$(DIST)
+	cp $(TARGET) $(DOCS) build/dist/$(DIST)/
+ifeq ($(OS),Windows_NT)
+	cd build/dist && zip -qr ../$(DIST).zip $(DIST)
+else
+	tar -C build/dist -czf $(ARCHIVE) $(DIST)
+endif
+	rm -rf build/dist
+	@echo "Created $(ARCHIVE)"
+
+.PHONY: all clean dist
