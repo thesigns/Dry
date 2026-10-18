@@ -88,3 +88,11 @@ printf 'y\npw\npw\n/start\nHello\n/end\n/list\n/exit\n' | build/dry.exe /tmp/t/t
 ```
 
 The following can only be verified manually in a real terminal: hidden password input, typed non-ASCII characters, Ctrl+C, and clearing the screen on exit.
+
+## Ideas
+
+Planned but not started. After 0.1.0 the author is using dry day to day first, so new ideas should come from that use. Suggested order:
+
+1. **CI on GitHub Actions** (`.github/workflows/build.yml`): build on `windows-latest` (w64devkit or MSYS2 MinGW, plus libsodium) and `ubuntu-latest` (`libsodium-dev`) on every push, warnings as errors. This is how the never-compiled Linux path (`platform_posix.c`) gets built and tested, since the author has no Linux machine.
+2. **`make test`**: a script-driven smoke suite that pipes input as in Testing above, in a temporary directory. It should cover create/open, wrong password, `/passwd`, `/undo`, `/find` with Polish letters, `/export` escaping and refusal of `.dry` targets, and the lock (second process refused). CI should run it on both platforms.
+3. **Backup**: once a day, on the first save, keep the previous encrypted file as `<name>.dry.bak`, so a damaged disk, an accidental delete, or a sync tool overwriting the file does not lose the whole diary. The copy is the same ciphertext, so nothing leaks.
