@@ -1,0 +1,13 @@
+# Normalize text files to LF in the repository and in working copies
+* text=auto eol=lf
+
+*.c        text eol=lf
+*.h        text eol=lf
+*.md       text eol=lf
+Makefile   text eol=lf
+
+# Binaries – no line-ending conversion, no diffs
+*.a        binary
+*.dll      binary
+*.exe      binary
+*.dry      binary

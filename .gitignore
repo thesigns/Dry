@@ -1,0 +1,18 @@
+# Build output
+build/
+*.o
+*.exe
+
+# Dependencies (libsodium is installed locally, see README.md)
+third_party/
+
+# Diary files – never commit personal (even encrypted) diaries
+*.dry
+*.dry.tmp
+
+# Editor / OS
+.vscode/
+*.swp
+*~
+Thumbs.db
+.DS_Store
