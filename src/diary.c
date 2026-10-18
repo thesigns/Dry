@@ -68,6 +68,61 @@ void diary_free(Diary *d)
     diary_init(d);
 }
 
+/* --- Markdown export --- */
+
+/* If a line starting at p would be read as Markdown block syntax (heading, quote,
+ * list, rule, code fence, table, HTML block), returns the offset where a backslash
+ * escapes it; otherwise -1. */
+static int block_marker(const char *p)
+{
+    const char *q = p;
+
+    if (*p && strchr("#>-+*=_`~|<\\", *p))
+        return 0;
+    while (*q >= '0' && *q <= '9')
+        q++;
+    return q > p && (*q == '.' || *q == ')') ? (int)(q - p) : -1; /* "1." → "1\." */
+}
+
+static bool write_paragraph(const char *text, FILE *f)
+{
+    int esc;
+
+    /* Leading spaces would turn the line into a code block, so keep them visible. */
+    for (; *text == ' ' || *text == '\t'; text++) {
+        if (fputs(*text == ' ' ? "&nbsp;" : "&nbsp;&nbsp;&nbsp;&nbsp;", f) == EOF)
+            return false;
+    }
+    esc = block_marker(text);
+    if (esc >= 0) {
+        if (fwrite(text, 1, (size_t)esc, f) != (size_t)esc || fputc('\\', f) == EOF)
+            return false;
+        text += esc;
+    }
+    return fputs(text, f) != EOF && fputs("\n\n", f) != EOF;
+}
+
+bool diary_write_markdown(const Diary *d, const char *title, FILE *f)
+{
+    if (fprintf(f, "# %s\n\n", title) < 0)
+        return false;
+    for (size_t i = 0; i < d->count; i++) {
+        const Entry *e = &d->entries[i];
+        if (fprintf(f, "## #%05u %s\n\n", (unsigned)e->id, e->date) < 0)
+            return false;
+        for (size_t j = 0; j < e->count; j++) {
+            const Segment *s = &e->segs[j];
+            if (fprintf(f, "### %s\n\n", s->time) < 0)
+                return false;
+            for (size_t k = 0; k < s->count; k++) {
+                if (!write_paragraph(s->paras[k], f))
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+
 uint32_t diary_next_id(const Diary *d)
 {
     uint32_t max = 0;

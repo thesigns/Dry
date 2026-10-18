@@ -27,6 +27,7 @@ dry> /exit
 | `/undo` | Remove the last paragraph of today's entry |
 | `/list [N]` | Show the last N entries (default 10) |
 | `/show [N \| YYYY-MM-DD]` | Show a full entry; with no argument, shows today's |
+| `/export [file]` | Save the whole diary as a Markdown file (**not encrypted**; default `<name>.md` next to the diary) |
 | `/passwd` | Change the password |
 | `/help` | Show help |
 | `/exit` | Quit |

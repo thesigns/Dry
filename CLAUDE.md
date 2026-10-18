@@ -32,6 +32,7 @@ After opening, a prompt (`dry>`, or `YYYY-MM-DD>` while writing) accepts these c
 | `/undo` | Remove the last paragraph of today's entry; empty segments and entries are dropped |
 | `/list [N]` | Last N entries (default 10): `#00001 2026-10-17 -- preview (...)` |
 | `/show [N \| YYYY-MM-DD]` | Full entry; with no argument, today's entry |
+| `/export [F]` | Unencrypted Markdown export after a warning and `[y/N]` (plus another one to overwrite). No argument: `<name>.md` next to the diary; a bare name goes into the diary's directory; `.md` is added if there is no extension; `.dry` targets are refused. Block markers at the start of a paragraph are escaped |
 | `/passwd` | Change the password: asks for the current one, then the new one twice; re-keys with a fresh salt |
 | `/help` | Show help |
 | `/exit` | Quit; `/quit`, EOF and Ctrl+C also quit |
@@ -73,7 +74,3 @@ printf 'y\npw\npw\n/start\nHello\n/end\n/list\n/exit\n' | build/dry.exe /tmp/t/t
 ```
 
 The following can only be verified manually in a real terminal: hidden password input, typed non-ASCII characters, Ctrl+C, and clearing the screen on exit.
-
-## Not implemented yet
-
-- `/export`

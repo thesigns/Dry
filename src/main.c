@@ -222,6 +222,19 @@ static void print_entry(const Entry *e)
     }
 }
 
+static bool ask_yes(void)
+{
+    char *line = NULL;
+    bool yes;
+
+    if (platform_read_line(&line) != READ_OK)
+        return false;
+    rtrim(line);
+    yes = strcmp(line, "y") == 0 || strcmp(line, "Y") == 0 || strcmp(line, "yes") == 0;
+    free_line(line);
+    return yes;
+}
+
 /* Asks for a new password twice into pw (both buffers PASSWORD_MAX, sodium_malloc). */
 static bool ask_new_password(char *pw, char *pw2)
 {
@@ -257,6 +270,7 @@ static void cmd_help(void)
         "  /undo       remove the last paragraph of today's entry\n"
         "  /list [N]   last N entries (default 10)\n"
         "  /show [N]   full entry number N, date YYYY-MM-DD, or today's entry\n"
+        "  /export [F] save the diary as an UNENCRYPTED Markdown file\n"
         "  /passwd     change the password\n"
         "  /help       this help\n"
         "  /exit       quit\n"
@@ -421,6 +435,103 @@ static void cmd_undo(App *app)
     save_diary(app);
 }
 
+/* File name part of a path. */
+static const char *path_base(const char *path)
+{
+    const char *base = path;
+    for (const char *p = path; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':')
+            base = p + 1;
+    }
+    return base;
+}
+
+/* Export path: no argument → "<diary>.md" next to the diary; a bare name goes into
+ * the diary's directory; a path is used as given. ".md" is added if there is no extension. */
+static char *export_path(const char *diary_path, const char *arg)
+{
+    const char *dir_end = path_base(diary_path);
+    const char *name, *dot;
+    size_t dir_len, name_len, len;
+    char *res;
+
+    if (*arg) {
+        name = arg;
+        dir_len = path_base(arg) != arg ? 0 : (size_t)(dir_end - diary_path);
+        name_len = strlen(arg);
+        dot = strchr(path_base(arg), '.');
+    } else {
+        name = dir_end;
+        dir_len = (size_t)(dir_end - diary_path);
+        dot = strrchr(dir_end, '.');
+        name_len = dot ? (size_t)(dot - dir_end) : strlen(dir_end);
+        dot = NULL;
+    }
+    len = dir_len + name_len + 4;
+    res = malloc(len);
+    if (res)
+        snprintf(res, len, "%.*s%.*s%s", (int)dir_len, diary_path, (int)name_len, name,
+                 dot ? "" : ".md");
+    return res;
+}
+
+static void cmd_export(App *app, const char *arg)
+{
+    const char *base = path_base(app->store.path), *ext;
+    char *path = export_path(app->store.path, arg), *title = NULL;
+    size_t title_len;
+    FILE *f;
+    bool ok;
+
+    if (!path) {
+        put("ERROR: out of memory.\n");
+        return;
+    }
+    ext = strrchr(path_base(path), '.');
+    if (ext && strlen(ext) == 4 && (ext[1] | 0x20) == 'd' && (ext[2] | 0x20) == 'r' &&
+        (ext[3] | 0x20) == 'y') {
+        put("Refusing to export to a .dry file – pick another name, e.g. /export notes.md\n");
+        goto done;
+    }
+    out("WARNING: the export is NOT encrypted. Anyone who can read\n"
+        "  %s\n"
+        "can read your whole diary. Delete the file when you no longer need it.\n"
+        "Export the diary (entries: %zu)? [y/N] ", path, app->diary.count);
+    if (!ask_yes()) {
+        put("Export cancelled.\n");
+        goto done;
+    }
+    if (platform_file_exists(path)) {
+        put("The file already exists. Overwrite it? [y/N] ");
+        if (!ask_yes()) {
+            put("Export cancelled.\n");
+            goto done;
+        }
+    }
+
+    title_len = strrchr(base, '.') ? (size_t)(strrchr(base, '.') - base) : strlen(base);
+    title = malloc(title_len + 1);
+    f = title ? platform_fopen(path, "wb") : NULL;
+    if (!f) {
+        out("ERROR: cannot write \"%s\".\n", path);
+        goto done;
+    }
+    memcpy(title, base, title_len);
+    title[title_len] = '\0';
+    ok = diary_write_markdown(&app->diary, title, f);
+    if (fclose(f) != 0)
+        ok = false;
+    if (ok) {
+        out("Exported to \"%s\".\n", path);
+    } else {
+        platform_remove_file(path);
+        out("ERROR: writing \"%s\" failed – nothing was exported.\n", path);
+    }
+done:
+    free(title);
+    free(path);
+}
+
 static void cmd_passwd(App *app)
 {
     char *pw = sodium_malloc(PASSWORD_MAX), *pw2 = sodium_malloc(PASSWORD_MAX);
@@ -482,6 +593,8 @@ static bool handle_line(App *app, char *line)
             cmd_list(app, arg);
         else if (strcmp(cmd, "show") == 0)
             cmd_show(app, arg);
+        else if (strcmp(cmd, "export") == 0)
+            cmd_export(app, arg);
         else if (strcmp(cmd, "passwd") == 0)
             cmd_passwd(app);
         else if (strcmp(cmd, "help") == 0)
@@ -539,19 +652,6 @@ static bool open_existing(App *app, const char *path)
     }
     sodium_free(pw);
     return ok;
-}
-
-static bool ask_yes(void)
-{
-    char *line = NULL;
-    bool yes;
-
-    if (platform_read_line(&line) != READ_OK)
-        return false;
-    rtrim(line);
-    yes = strcmp(line, "y") == 0 || strcmp(line, "Y") == 0 || strcmp(line, "yes") == 0;
-    free_line(line);
-    return yes;
 }
 
 static bool create_new(App *app, const char *path)
