@@ -3,6 +3,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -148,6 +149,46 @@ bool platform_replace_file(const char *src, const char *dst)
 bool platform_remove_file(const char *path)
 {
     return remove(path) == 0;
+}
+
+struct PlatformLock {
+    int fd;
+};
+
+/* A POSIX record lock is released by the kernel when the process exits.
+ * The lock file itself stays in place: unlinking it would race with other processes. */
+int platform_lock(const char *path, PlatformLock **out)
+{
+    struct flock fl;
+    PlatformLock *lock;
+    int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+
+    if (fd < 0)
+        return LOCK_ERROR;
+    memset(&fl, 0, sizeof fl);
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    if (fcntl(fd, F_SETLK, &fl) != 0) {
+        int busy = errno == EACCES || errno == EAGAIN;
+        close(fd);
+        return busy ? LOCK_BUSY : LOCK_ERROR;
+    }
+    lock = malloc(sizeof *lock);
+    if (!lock) {
+        close(fd);
+        return LOCK_ERROR;
+    }
+    lock->fd = fd;
+    *out = lock;
+    return LOCK_OK;
+}
+
+void platform_unlock(PlatformLock *lock)
+{
+    if (lock) {
+        close(lock->fd);
+        free(lock);
+    }
 }
 
 void platform_localtime(time_t t, struct tm *out)

@@ -318,6 +318,43 @@ bool platform_remove_file(const char *path)
     return ok;
 }
 
+struct PlatformLock {
+    HANDLE h;
+};
+
+/* No sharing allowed: a second open fails with ERROR_SHARING_VIOLATION.
+ * Windows deletes the file once the handle is closed, also after a crash. */
+int platform_lock(const char *path, PlatformLock **out)
+{
+    wchar_t *wpath = utf8_to_wide(path);
+    PlatformLock *lock;
+    HANDLE h;
+
+    if (!wpath)
+        return LOCK_ERROR;
+    h = CreateFileW(wpath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                    FILE_ATTRIBUTE_HIDDEN | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+    free(wpath);
+    if (h == INVALID_HANDLE_VALUE)
+        return GetLastError() == ERROR_SHARING_VIOLATION ? LOCK_BUSY : LOCK_ERROR;
+    lock = malloc(sizeof *lock);
+    if (!lock) {
+        CloseHandle(h);
+        return LOCK_ERROR;
+    }
+    lock->h = h;
+    *out = lock;
+    return LOCK_OK;
+}
+
+void platform_unlock(PlatformLock *lock)
+{
+    if (lock) {
+        CloseHandle(lock->h);
+        free(lock);
+    }
+}
+
 void platform_localtime(time_t t, struct tm *out)
 {
     localtime_s(out, &t);

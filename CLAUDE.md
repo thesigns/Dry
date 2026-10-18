@@ -43,7 +43,7 @@ While writing, each line is one paragraph and is saved immediately. A line start
 - `src/main.c`: argument handling, path resolution, password prompts, the command loop, and all user-facing messages.
 - `src/diary.c/.h`: in-memory model and (de)serialization of the plaintext payload. The model is Diary → Entry (one per date, sequential `id`) → Segment (`HH:MM`, one per `/start`) → paragraphs (UTF-8 strings).
 - `src/store.c/.h`: the encrypted file format, key derivation, encryption, and atomic save.
-- `src/platform.h` with `platform_win.c` and `platform_posix.c`: all OS-specific code, namely console I/O, password input without echo, UTF-8 argv, exe directory, file open/replace/sync, the Ctrl+C handler, and `localtime`.
+- `src/platform.h` with `platform_win.c` and `platform_posix.c`: all OS-specific code, namely console I/O, password input without echo, UTF-8 argv, exe directory, file open/replace/sync, the lock file, the Ctrl+C handler, and `localtime`.
 
 ## Cryptography and file format
 
@@ -51,6 +51,7 @@ While writing, each line is one paragraph and is saved immediately. A line start
 - **Cipher:** `crypto_aead_xchacha20poly1305_ietf`. The whole plaintext is re-encrypted with a fresh random nonce on every save. The full 64-byte header is the AAD.
 - **Header (little-endian):** `"DRY\x1A"` | version u8 = 1 | KDF id u8 = 1 | reserved u16 | opslimit u64 | memlimit u64 | salt[16] | nonce[24]. The ciphertext and 16-byte MAC follow.
 - **Payload (`diary.c`, version byte = 1):** counts and lengths are u32 LE. Dates are stored as `YYYY-MM-DD` text and times as `HH:MM` text, both local time, so moving a diary between time zones never shifts an entry to another day.
+- **Locking:** while a diary is open, `<path>.lock` is held exclusively (Windows: share mode 0 + `FILE_FLAG_DELETE_ON_CLOSE`, so the file disappears on exit; Linux: `fcntl` lock, the file stays). A second process refuses to open the diary. The lock is on a separate file because every save replaces the diary file.
 - **Saving:** the file is written to `<path>.tmp`, flushed to disk, then swapped in with `MoveFileExW` or `rename`.
 - **Changing the format:** any format change must bump the relevant version byte and keep existing `.dry` files readable. Never `fwrite` structs; integers are always serialized byte by byte.
 
@@ -76,4 +77,3 @@ The following can only be verified manually in a real terminal: hidden password 
 ## Not implemented yet
 
 - `/export`
-- Protection against opening the same diary in two processes; currently the last save wins.

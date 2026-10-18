@@ -50,6 +50,17 @@ bool platform_sync_file(FILE *f);
 bool platform_replace_file(const char *src, const char *dst);
 bool platform_remove_file(const char *path);
 
+/* Exclusive lock on a file (created if missing), held until platform_unlock()
+ * or the end of the process – even one that crashes. */
+enum {
+    LOCK_OK,
+    LOCK_BUSY, /* another process holds the lock */
+    LOCK_ERROR
+};
+typedef struct PlatformLock PlatformLock;
+int platform_lock(const char *path, PlatformLock **out);
+void platform_unlock(PlatformLock *lock);
+
 void platform_localtime(time_t t, struct tm *out);
 
 #endif

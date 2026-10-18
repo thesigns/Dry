@@ -124,6 +124,28 @@ static char *resolve_path(const char *arg)
     return res;
 }
 
+/* Locks "<path>.lock" so that the diary cannot be open in two processes at once
+ * (every save rewrites the whole file, so the last one would silently win). */
+static bool lock_diary(const char *path, PlatformLock **lock)
+{
+    size_t len = strlen(path) + 6;
+    char *lock_path = malloc(len);
+    int r;
+
+    if (!lock_path) {
+        put("Out of memory.\n");
+        return false;
+    }
+    snprintf(lock_path, len, "%s.lock", path);
+    r = platform_lock(lock_path, lock);
+    free(lock_path);
+    if (r == LOCK_BUSY)
+        put("The diary is already open in another window. Close it there first.\n");
+    else if (r != LOCK_OK)
+        out("Cannot create the lock file \"%s.lock\".\n", path);
+    return r == LOCK_OK;
+}
+
 static bool save_diary(App *app)
 {
     unsigned char *buf;
@@ -592,6 +614,7 @@ static void run(App *app)
 int main(int argc, char **argv)
 {
     App app;
+    PlatformLock *lock = NULL;
     char **uargv;
     char *path;
     int uargc = 0;
@@ -615,6 +638,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (!lock_diary(path, &lock)) {
+        free(path);
+        return 1;
+    }
+
     memset(&app, 0, sizeof app);
     diary_init(&app.diary);
     ok = platform_file_exists(path) ? open_existing(&app, path) : create_new(&app, path);
@@ -626,6 +654,7 @@ int main(int argc, char **argv)
         platform_clear_screen();
         put("Diary closed.\n");
     }
+    platform_unlock(lock);
     free(path);
     return ok ? 0 : 1;
 }

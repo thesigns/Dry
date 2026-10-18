@@ -33,6 +33,8 @@ dry> /exit
 
 While writing, each line you enter is one paragraph and is saved to disk immediately. To start a paragraph with `/`, type `//`.
 
+A diary can be open in only one window at a time; a second `dry` on the same file refuses to open it.
+
 There is no password recovery. If you forget the password, the diary cannot be read.
 
 ## Building
