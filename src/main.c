@@ -17,6 +17,7 @@
 #define LIST_DEFAULT  10
 #define PREVIEW_CHARS 50
 #define FIND_CONTEXT  30 /* characters shown on each side of a /find match */
+#define WRAP_WIDTH    75 /* /show wraps paragraphs at this many characters */
 
 typedef struct {
     Diary diary;
@@ -212,6 +213,41 @@ static void make_preview(const Entry *e, char *buf, size_t size)
         strcat(buf, " (...)");
 }
 
+/* Prints a paragraph wrapped at spaces to WRAP_WIDTH characters (not bytes).
+ * A word longer than the width stays whole on its own line. */
+static void put_wrapped(const char *s)
+{
+    const char *p = s;
+    size_t col = 0;
+
+    while (*p) {
+        const char *spaces = p, *word;
+        size_t nspaces, wlen = 0;
+
+        while (*p == ' ')
+            p++;
+        if (!*p)
+            break; /* trailing spaces */
+        nspaces = (size_t)(p - spaces);
+        word = p;
+        while (*p && *p != ' ') {
+            if (((unsigned char)*p & 0xC0) != 0x80)
+                wlen++;
+            p++;
+        }
+        if (col > 0 && col + nspaces + wlen > WRAP_WIDTH) {
+            put("\n");
+            col = 0;
+        } else {
+            platform_write(spaces, nspaces);
+            col += nspaces;
+        }
+        platform_write(word, (size_t)(p - word));
+        col += wlen;
+    }
+    put("\n");
+}
+
 static void print_entry(const Entry *e)
 {
     out("#%05u %s\n", (unsigned)e->id, e->date);
@@ -219,8 +255,9 @@ static void print_entry(const Entry *e)
         const Segment *s = &e->segs[i];
         out("\n[%s]\n", s->time);
         for (size_t j = 0; j < s->count; j++) {
-            put(s->paras[j]);
-            put("\n");
+            if (j > 0)
+                put("\n");
+            put_wrapped(s->paras[j]);
         }
     }
 }

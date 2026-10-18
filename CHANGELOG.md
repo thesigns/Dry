@@ -2,6 +2,10 @@
 
 All notable changes to dry are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+- `/show` wraps paragraphs at spaces to 75 characters and separates paragraphs with a blank line. A word longer than that (e.g. a URL) stays whole.
+
 ## [0.1.0] – 2026-10-18
 
 First release.
